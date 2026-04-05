@@ -1,33 +1,33 @@
 ---
 name: github-pr-review-operation
-description: GitHub Pull Requestのレビュー操作を行うスキル。PR情報取得、差分確認、コメント取得・投稿、インラインコメント、コメント返信をghコマンドで実行する。PRレビュー、コードレビュー、PR操作が必要な時に使用。
+description: Skill for GitHub Pull Request review operations. Perform PR info retrieval, diff inspection, comment fetching/posting, inline comments, and comment replies using gh CLI. Use when PR review, code review, or PR operations are needed.
 ---
 
 # GitHub PR Review Operation
 
-GitHub CLI (`gh`) を使ったPRレビュー操作。
+PR review operations using GitHub CLI (`gh`).
 
-## 前提条件
+## Prerequisites
 
-- `gh` インストール済み
-- `gh auth login` で認証済み
+- `gh` installed
+- Authenticated via `gh auth login`
 
-## PR URLのパース
+## Parsing PR URL
 
-PR URL `https://github.com/OWNER/REPO/pull/NUMBER` から以下を抽出して使用：
-- `OWNER`: リポジトリオーナー
-- `REPO`: リポジトリ名
-- `NUMBER`: PR番号
+Extract the following from PR URL `https://github.com/OWNER/REPO/pull/NUMBER`:
+- `OWNER`: Repository owner
+- `REPO`: Repository name
+- `NUMBER`: PR number
 
-## 操作一覧
+## Operations
 
-### 1. PR情報取得
+### 1. Get PR Info
 
 ```bash
 gh pr view NUMBER --repo OWNER/REPO --json title,body,author,state,baseRefName,headRefName,url
 ```
 
-### 2. 差分取得（行番号付き）
+### 2. Get Diff (with line numbers)
 
 ```bash
 gh pr diff NUMBER --repo OWNER/REPO | awk '
@@ -46,59 +46,59 @@ gh pr diff NUMBER --repo OWNER/REPO | awk '
 '
 ```
 
-出力例：
+Example output:
 ```
 @@ -46,15 +46,25 @@ jobs:
 L46   R46  |            prompt: |
-L49       | -            （削除行）
-     R49  | +            （追加行）
-L50   R50  |              # レビューガイドライン
+L49       | -            (deleted line)
+     R49  | +            (added line)
+L50   R50  |              # Review guidelines
 ```
 
-- `L数字`: LEFT(base)側の行番号 → インラインコメントで`side=LEFT`に使用
-- `R数字`: RIGHT(head)側の行番号 → インラインコメントで`side=RIGHT`に使用
+- `L<number>`: LEFT (base) side line number - use with `side=LEFT` for inline comments
+- `R<number>`: RIGHT (head) side line number - use with `side=RIGHT` for inline comments
 
-### 3. コメント取得
+### 3. Get Comments
 
-Issue Comments（PR全体へのコメント）:
+Issue Comments (comments on the entire PR):
 ```bash
 gh api repos/OWNER/REPO/issues/NUMBER/comments --jq '.[] | {id, user: .user.login, created_at, body}'
 ```
 
-Review Comments（コード行へのコメント）:
+Review Comments (comments on specific code lines):
 ```bash
 gh api repos/OWNER/REPO/pulls/NUMBER/comments --jq '.[] | {id, user: .user.login, path, line, created_at, body, in_reply_to_id}'
 ```
 
-### 4. PRにコメント
+### 4. Comment on PR
 
 ```bash
-gh pr comment NUMBER --repo OWNER/REPO --body "コメント内容"
+gh pr comment NUMBER --repo OWNER/REPO --body "Comment body"
 ```
 
-### 5. インラインコメント（コード行指定）
+### 5. Inline Comment (on specific code lines)
 
-まずhead commit SHAを取得：
+First, get the head commit SHA:
 ```bash
 gh api repos/OWNER/REPO/pulls/NUMBER --jq '.head.sha'
 ```
 
-単一行コメント：
+Single line comment:
 ```bash
 gh api repos/OWNER/REPO/pulls/NUMBER/comments \
   --method POST \
-  -f body="コメント内容" \
+  -f body="Comment body" \
   -f commit_id="COMMIT_SHA" \
   -f path="src/example.py" \
   -F line=15 \
   -f side=RIGHT
 ```
 
-複数行コメント（10〜15行目）：
+Multi-line comment (lines 10-15):
 ```bash
 gh api repos/OWNER/REPO/pulls/NUMBER/comments \
   --method POST \
-  -f body="コメント内容" \
+  -f body="Comment body" \
   -f commit_id="COMMIT_SHA" \
   -f path="src/example.py" \
   -F line=15 \
@@ -107,16 +107,16 @@ gh api repos/OWNER/REPO/pulls/NUMBER/comments \
   -f start_side=RIGHT
 ```
 
-**注意点：**
-- `-F` (大文字): 数値パラメータ（`line`, `start_line`）に使用。`-f`だと文字列になりエラーになる
-- `side`: `RIGHT`（追加行）または `LEFT`（削除行）
+**Notes:**
+- `-F` (uppercase): Use for numeric parameters (`line`, `start_line`). Using `-f` sends them as strings and causes errors
+- `side`: `RIGHT` (added lines) or `LEFT` (deleted lines)
 
-### 6. コメントへ返信
+### 6. Reply to a Comment
 
 ```bash
 gh api repos/OWNER/REPO/pulls/NUMBER/comments/COMMENT_ID/replies \
   --method POST \
-  -f body="返信内容"
+  -f body="Reply body"
 ```
 
-`COMMENT_ID`はコメント取得で得た`id`を使用。
+Use the `id` obtained from comment retrieval as `COMMENT_ID`.
