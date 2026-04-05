@@ -1,6 +1,6 @@
 ---
 name: github-pr-review-operation
-description: Skill for GitHub Pull Request review operations. Perform PR info retrieval, diff inspection, comment fetching/posting, inline comments, and comment replies using gh CLI. Use when PR review, code review, or PR operations are needed.
+description: Use this skill when the user needs to interact with a GitHub Pull Request — reviewing code, reading diffs, posting review comments, or replying to existing comments. Activate even when the user provides just a PR URL and asks to "check it" or "leave feedback" without explicitly mentioning "review."
 ---
 
 # GitHub PR Review Operation
