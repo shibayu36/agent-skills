@@ -12,12 +12,26 @@ PR review operations using GitHub CLI (`gh`).
 - `gh` installed
 - Authenticated via `gh auth login`
 
-## Parsing PR URL
+## Resolving OWNER/REPO/NUMBER
 
-Extract the following from PR URL `https://github.com/OWNER/REPO/pull/NUMBER`:
-- `OWNER`: Repository owner
-- `REPO`: Repository name
-- `NUMBER`: PR number
+**Never guess `OWNER`, `REPO`, or `NUMBER` from directory names, paths, or context.**
+Incorrect guesses cause 404 errors and waste API calls.
+
+Pick the approach that matches the input, then use the resulting `OWNER`, `REPO`, and
+`NUMBER` in every Operation command that follows.
+
+| Input | How to resolve |
+|---|---|
+| PR URL given (`https://github.com/OWNER/REPO/pull/NUMBER`) | Parse `OWNER`, `REPO`, `NUMBER` directly from the URL. |
+| PR number given | Run `gh pr view <NUMBER> --json url --jq .url` and parse the returned URL. |
+| No identifier (e.g., "this PR" on a branch) | Run `gh pr view --json url --jq .url` and parse the returned URL. |
+
+For the `gh pr view` cases, the command resolves the number or branch against the current
+working directory's git repository, so `OWNER/REPO` come from the real repo context
+rather than a guess.
+
+If `gh pr view` fails (not in a git repo, branch has no PR, invalid number), ask the user
+for the full PR URL rather than guessing.
 
 ## Operations
 
