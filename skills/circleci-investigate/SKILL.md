@@ -21,10 +21,17 @@ CircleCI のジョブ・ワークフロー・パイプラインを調査する�
 ## Usage
 
 ```bash
-${SKILL_DIR}/scripts/circleci.py <subcommand> <input> [flags...]
+<SKILL_DIR>/scripts/circleci.py <subcommand> <input> [flags...]
 ```
 
-`${SKILL_DIR}` は本 SKILL.md が置かれているディレクトリ。Claude は実行時に絶対パスへ展開すること。
+`<SKILL_DIR>` は本 SKILL.md が置かれているディレクトリを指すプレースホルダ。呼び出し側は実行時に絶対パスへ置換すること（シェル変数として扱わない）。
+
+### Recommended invocation pattern
+
+permission 管理をシンプルに保つため、以下の呼び出し方を推奨する:
+
+- 1 つの Bash 呼び出しでは 1 つのコマンドだけを実行する（`&&` / `;` / 改行で複数コマンドを連結しない）
+- `DIR=$(...)` のようなシェル置換で値を引き回さず、スクリプトが stdout に出すパスを呼び出し側で読み取り、次の Bash 呼び出しに**リテラル引数**として埋め込む
 
 ### Input formats
 
@@ -108,65 +115,102 @@ URL を受け付けるサブコマンド (`jobs` / `artifacts` / `steps` / `test
 
 ### `jobs`
 
+ジョブ URL から状態確認（jobs の出力から該当ジョブを抽出）。jq への受け渡しはパイプ 1 段なので 1 Bash 呼び出しで OK:
+
 ```bash
-# ジョブ URL から状態確認 (jobs の出力から該当ジョブを抽出)
-"${SKILL_DIR}/scripts/circleci.py" jobs \
+<SKILL_DIR>/scripts/circleci.py jobs \
   'https://app.circleci.com/pipelines/github/myorg/myproject/12345/workflows/abcdef01-2345-6789-abcd-ef0123456789/jobs/9876' \
   | jq '.items[] | select(.job_number == 9876)'
+```
 
-# パイプライン URL から workflow ごとの全ジョブ一覧 (出力は workflows 配列)
-"${SKILL_DIR}/scripts/circleci.py" jobs \
+パイプライン URL から workflow ごとの全ジョブ一覧（出力は workflows 配列）:
+
+```bash
+<SKILL_DIR>/scripts/circleci.py jobs \
   'https://app.circleci.com/pipelines/github/myorg/myproject/12345' \
   | jq '.workflows[] | {wf: .name, jobs: [.jobs[] | {name, status}]}'
 ```
 
 ### `steps`
 
+ジョブ URL から step メタ + 全 step の生ログを保存:
+
 ```bash
-# ジョブ URL から step メタ + 全 step の生ログを保存 → 失敗 step だけ抽出
-DIR=$("${SKILL_DIR}/scripts/circleci.py" steps \
+<SKILL_DIR>/scripts/circleci.py steps \
   'https://app.circleci.com/pipelines/github/myorg/myproject/12345/workflows/abcdef01-2345-6789-abcd-ef0123456789/jobs/9876' \
-  --output-dir ./tmp)
-jq '.steps[] | select(.actions[].status == "failed")' "$DIR/meta.json"
+  --output-dir ./tmp
+# stdout: <DIR> = ./tmp/circleci-steps-myorg-myproject-build-9876
+```
 
-# ブランチ + ジョブ名で最新 run の steps を保存 → 遅い step トップ 5
-DIR=$("${SKILL_DIR}/scripts/circleci.py" steps \
+stdout から得た `<DIR>` をリテラルに埋め込んで、次の Bash 呼び出しで jq する（失敗 step 抽出例）:
+
+```bash
+jq '.steps[] | select(.actions[].status == "failed")' <DIR>/meta.json
+```
+
+遅い step トップ 5 を見たいときも同様に 2 段階。まず steps を保存:
+
+```bash
+<SKILL_DIR>/scripts/circleci.py steps \
   --branch main --project gh/myorg/myproject --job build \
-  --output-dir ./tmp)
-jq '[.steps[] | {name, ms: ([.actions[].run_time_millis] | add)}] | sort_by(-.ms) | .[0:5]' "$DIR/meta.json"
+  --output-dir ./tmp
+```
 
-# リソース使用量だけが知りたい場合も steps で取れる (meta.json に集約)
-DIR=$("${SKILL_DIR}/scripts/circleci.py" steps \
-  'https://app.circleci.com/pipelines/github/myorg/myproject/12345/workflows/abcdef01-2345-6789-abcd-ef0123456789/jobs/9876' \
-  --output-dir ./tmp)
-jq '{parallelism, executor, resource_class, build_time_millis}' "$DIR/meta.json"
+stdout の `<DIR>` を埋め込んで:
+
+```bash
+jq '[.steps[] | {name, ms: ([.actions[].run_time_millis] | add)}] | sort_by(-.ms) | .[0:5]' <DIR>/meta.json
+```
+
+リソース使用量だけが知りたい場合も `steps` の `meta.json` から拾える:
+
+```bash
+jq '{parallelism, executor, resource_class, build_time_millis}' <DIR>/meta.json
 ```
 
 ### `tests`
 
+失敗テスト一覧（まず保存、次に jq で抽出）:
+
 ```bash
-# 失敗テスト一覧 (tests を保存 → jq で抽出)
-TESTS_FILE=$("${SKILL_DIR}/scripts/circleci.py" tests \
+<SKILL_DIR>/scripts/circleci.py tests \
   --branch main --project gh/myorg/myproject --job test \
-  --output-dir ./tmp)
-jq '.items[] | select(.result == "failure")' "$TESTS_FILE"
+  --output-dir ./tmp
+# stdout: <TESTS_FILE> = ./tmp/circleci-tests-myorg-myproject-test-<build>.json
+```
+
+```bash
+jq '.items[] | select(.result == "failure")' <TESTS_FILE>
 ```
 
 ### `pipelines`
 
+ブランチの pipeline 一覧（新しい順、各 pipeline に配下 workflow を含む）:
+
 ```bash
-# ブランチの pipeline 一覧 (新しい順、各 pipeline に配下 workflow を含む)
-"${SKILL_DIR}/scripts/circleci.py" pipelines \
+<SKILL_DIR>/scripts/circleci.py pipelines \
   --branch main --project gh/myorg/myproject
+```
 
-# pipelines の出力から pipelineURL を取り出して jobs サブコマンドに繋ぐ
-PIPELINE_URL=$("${SKILL_DIR}/scripts/circleci.py" pipelines \
+pipelines の出力から pipelineURL を取り出して jobs サブコマンドに繋ぐ場合は、まず jq で URL を抽出:
+
+```bash
+<SKILL_DIR>/scripts/circleci.py pipelines \
   --branch main --project gh/myorg/myproject \
-  | jq -r '.items[0].pipelineURL')
-"${SKILL_DIR}/scripts/circleci.py" jobs "$PIPELINE_URL"
+  | jq -r '.items[0].pipelineURL'
+# stdout: <PIPELINE_URL>
+```
 
-# pipelines の続きを取得 (next_page_token を渡す)
-"${SKILL_DIR}/scripts/circleci.py" pipelines \
+stdout の URL をリテラルで次の呼び出しに渡す:
+
+```bash
+<SKILL_DIR>/scripts/circleci.py jobs '<PIPELINE_URL>'
+```
+
+pipelines の続きを取得（next_page_token を渡す）:
+
+```bash
+<SKILL_DIR>/scripts/circleci.py pipelines \
   --branch main --project gh/myorg/myproject \
   --page-token '<next_page_token>'
 ```
