@@ -593,10 +593,13 @@ def _step_log_filename(step_index: int, step_name: str, action_index: int) -> st
     Format: step-<step_index zero-padded 3>-<sanitized step name>-<action_index>.log
     The action_index is always present (even when parallelism == 1) so callers
     can read meta.json and open the file by name without checking for variants.
+
+    The sanitized step name is truncated to keep the filename within typical
+    OS limits (255 bytes per path component on macOS/Linux). step_index alone
+    guarantees uniqueness, so truncation cannot collide.
     """
-    return (
-        f"step-{step_index:03d}-{_sanitize_name(step_name)}-{action_index}.log"
-    )
+    sanitized = _sanitize_name(step_name)[:80]
+    return f"step-{step_index:03d}-{sanitized}-{action_index}.log"
 
 
 def cmd_steps(ctx: Context, args: argparse.Namespace) -> None:
