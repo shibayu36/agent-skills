@@ -6,6 +6,7 @@ Skills follow the [Agent Skills](https://agentskills.io/) format.
 
 ## Available Skills
 
+- **circleci-investigate** - Investigate CircleCI jobs, workflows, and pipelines. Fetches step logs, test results, artifacts, and resource usage from a job/pipeline URL or branch+job name. Use when debugging CI failures or analyzing build status.
 - **github-pr-review-operation** - GitHub Pull Request review operations using `gh` CLI. Use when performing PR reviews, reading diffs, posting comments, or replying to review threads.
 - **gws-docs-to-markdown** - Convert a Google Docs URL into a Markdown file with embedded images extracted to local files, using the `gws` CLI. Use when reading a Google Docs document.
 
