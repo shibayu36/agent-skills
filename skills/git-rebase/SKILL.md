@@ -1,6 +1,6 @@
 ---
 name: git-rebase
-description: git rebase を自然言語指示から非対話で実行する。commit 整理（squash / fixup / reword / drop / split / 順序入替）、upstream 取り込み、conflict 解消、stacked rebase（`--update-refs`）を扱う。「rebase して」「squash」「fixup」「reword」「split」「main 取り込んで」「conflict 解消」などのリクエストで使用。
+description: git rebase を自然言語指示から非対話で実行する。commit 整理（squash / fixup / reword / drop / split / 順序入替）、upstream 取り込み、branch 載せ替え（`--onto`）、conflict 解消、stacked rebase（`--update-refs`）を扱う。「rebase して」「squash」「fixup」「reword」「split」「main 取り込んで」「載せ替えて」「base 付け替え」「conflict 解消」などのリクエストで使用。
 user_invocable: true
 ---
 
@@ -21,7 +21,7 @@ git rebase を自然言語の指示から非対話で実行する skill。commit
    1. **進行中 rebase の検知**：`.git/rebase-merge` または `.git/rebase-apply` が存在すれば前回の rebase が中断したまま。ユーザーに `--continue / --abort / --skip` のどれにするか確認する。
    2. **detached HEAD の検知**：`git branch --show-current` で branch 名取得。出力が空なら detached HEAD と判定し、警告して続行確認。続行する場合は最終出力に `git branch <name>` のコマンドを添える。
    3. **dirty 判定**：`git status --porcelain` の出力で判定する。**ただしモード別に許容範囲が違う**：
-      - commit 整理 / upstream 取込 / reword / split（過去 commit 対象）：dirty なら commit/stash を促して中止
+      - commit 整理 / upstream 取込 / branch 載せ替え / reword / split（過去 commit 対象）：dirty なら commit/stash を促して中止
       - fixup workflow / amend 系 / 最新 commit の split：差分そのものが入力なので dirty を許容（rebase 開始前に staging 状況を確認）
    4. **rebase 前 HEAD sha の保持**：`git rev-parse HEAD` で現在 sha を取得し、skill 内で保持する。ユーザーが「戻して」等を要求した時に `git reset --hard <sha>` で戻すために使う（ユーザーには表示しない）。
 3. **対象 sha の特定**：`git log` を見て対象 sha を確定する。曖昧なら「候補 sha が一意に決まらない時」へ。
@@ -175,14 +175,20 @@ GIT_EDITOR='sh -c '\''cp "'$MSG_FILE'" "$1"'\'' --' git rebase --continue
 - `git fetch origin` → `git rebase <resolved>`（`<resolved>` は既に `origin/main` のような短形なので、頭に `origin/` を重ねない）。
 - conflict が起きたら「conflict 解消」へ。
 
-### 4. reword
+### 4. branch 載せ替え（--onto）
+
+- 派生元 branch から別 branch に付け替え／間違った base からの修正に使う。`git rebase --onto <newbase> <upstream>` で実行する（**`rebase -i` 不要**。todo / `GIT_SEQUENCE_EDITOR` 差し替えは行わない）。
+- `<newbase>` と `<upstream>` の両方を特定する。「A から B に載せ替え」→ `<upstream>=A`, `<newbase>=B`。`<upstream>` が曖昧なら自動推測せず候補提示で確認する（`git merge-base HEAD <newbase>` の自動採用はしない：stacked で `<upstream>` 手前の commit を巻き込む危険があるため）。
+- 実行前に `git log --reverse --oneline <upstream>..HEAD` で載せ替え対象 commit を提示し、`<newbase>` と実行コマンドと併せて Y/N 確認する。範囲が空なら no-op で停止。
+
+### 5. reword
 
 - ユーザーが新メッセージを明示指定 → 指定通り採用、確認なし。
 - 指定がない（「いい感じに直して」「内容に合わせて」など）→ `git show <sha>` の diff から変更目的を 1 行で要約し、リポジトリの直近 commit message のスタイル（命令形 / 体言止め等）に揃えた案を提案、ユーザー承認後に適用する。
 - 最新 commit のみが対象なら「単純ケースの最適化」の `git commit --amend` を使う。
 - それ以外は todo で対象 commit を `reword` にし、「todo + message 差し替え併用」で実行する。
 
-### 5. split
+### 6. split
 
 最新 commit のみが対象なら「単純ケースの最適化」のショートカット（`git reset HEAD^`）を使う。それ以外は以下の手順を踏む：
 
@@ -207,6 +213,7 @@ GIT_EDITOR='sh -c '\''cp "'$MSG_FILE'" "$1"'\'' --' git rebase --continue
   - commit 整理 / reword：`<base>..HEAD` の最古 commit
   - fixup workflow：`<target_sha>`
   - upstream 取込：通常 `<base>..HEAD` 全体（push 済み部分は普通含まれないが、再 push のケースでは含まれうる）
+  - branch 載せ替え：`<upstream>..HEAD` の最古 commit
 - 含まれる → 「push 済みなので force push が必要です。続行しますか？」を Y/N 確認する。
 - 続行されたら rebase 実行、最終出力に `git push --force-with-lease` を添えて終了する。
 - **skill 自身は push しない**。
