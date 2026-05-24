@@ -54,7 +54,7 @@ URL を受け付けるサブコマンド (`jobs` / `artifacts` / `steps` / `test
 | `jobs`      | ワークフロー内ジョブ一覧 JSON をインライン出力 (status / started_at / stopped_at / job_number / name 等を含む)。**単一ジョブの状態確認もこれで行う**。出力トップレベルは入力形式により 2 形式に分岐 (下記「`jobs` の出力スキーマ」参照) | URL 入力 3 形式すべて |
 | `pipelines` | ブランチ上の pipeline 一覧 (新しい順) を JSON でインライン出力。各 pipeline に `pipelineURL` と配下 workflow の生配列を含める。1ページのみ取得し、続きは `--page-token` で辿る。**用途**: 最新ではない過去 run を調査する / 同じブランチで並走している複数 pipeline から目的の pipelineURL を選ぶ。最新 run でいいなら他のサブコマンドが `--branch --project --job` で自動解決するのでこれは不要 | `--branch --project` のみ (URL 入力非対応) |
 | `artifacts` | artifact 一覧 (path, url, node_index) をインライン出力 (next_page_token を辿って全件) | ジョブ URL or ブランチ+ジョブ名 |
-| `steps`     | step メタ (resource_class / parallelism / 各 step・action の status / 所要時間) と 各 action の生 stdout/stderr をディレクトリ (`circleci-steps-...`) に保存し、絶対パスを stdout に出力。`--output-dir DIR` で保存先指定。**1 度の API コールで「リソース使用量の調査」と「ログの読解」の両方をカバー** (※ 実 CPU/メモリ使用率は CircleCI 公式 API では取得不可) | ジョブ URL or ブランチ+ジョブ名 |
+| `steps`     | step メタ (resource_class / parallelism / 各 step・action の status / 所要時間) と 各 action の生 stdout/stderr をディレクトリ (`circleci-steps-...`) に保存し、絶対パスを stdout に出力。`--output-dir DIR` で保存先指定。**1 度の API コールで「リソース使用量の調査」と「ログの読解」の両方をカバー** (※ 実 CPU/メモリ使用率は CircleCI 公式 API では取得不可)。`--logs` (all/failed/none) と `--logs-match REGEX` で取得するログを絞れる (下記「`steps` のログ絞り込み」参照) | ジョブ URL or ブランチ+ジョブ名 |
 | `tests`     | テスト結果全件 (next_page_token を辿る) を 1 ファイル (`circleci-tests-...json`) に保存し、絶対パスを stdout に出力。`--output-dir DIR` で保存先指定。フィルタは無し — 読み取り側で `jq` する | ジョブ URL or ブランチ+ジョブ名 |
 
 ### `jobs` の出力スキーマ
@@ -94,13 +94,33 @@ URL を受け付けるサブコマンド (`jobs` / `artifacts` / `steps` / `test
 - ディレクトリ名: `circleci-steps-<org>-<project>-<job_name>-<build_num>/`
 - **既存ディレクトリがあるとエラー終了**する (古い run と混ざらないようにするため)。再取得したいときは事前に削除する
 - 構成:
-  - `meta.json` — job 全体のメタ + `steps[].actions[]` 配列 (各 action に `log_path` で対応するログファイル名)
+  - `meta.json` — job 全体のメタ + `steps[].actions[]` 配列 (各 action に `log_path` = 対応するログファイル名 or null、`log_status` = ログ取得結果。下記「`steps` のログ絞り込み」参照)
   - `step-NNN-<sanitized name>-<action_index>.log` — 1 action 1 ファイルの生ログ。parallelism > 1 のときは `-0`, `-1`, ... と分かれる
 - 解析の典型フロー: まず `meta.json` を Read してどの step を見るか決める → 該当する `.log` だけ Read する (大きなジョブで巨大ログを全件 Read しなくて済む)
 - jq 例:
   - 失敗 step 抽出: `jq '.steps[] | select(.actions[].status == "failed")' <dir>/meta.json`
   - 遅い step トップ 5: `jq '[.steps[] | {name, ms: ([.actions[].run_time_millis] | add)}] | sort_by(-.ms) | .[0:5]' <dir>/meta.json`
   - 失敗 action のログパス一覧: `jq -r '.steps[].actions[] | select(.status == "failed") | .log_path' <dir>/meta.json`
+  - 絞り込みで未取得の action 一覧: `jq -r '.steps[].actions[] | select(.log_status == "skipped")' <dir>/meta.json`
+
+#### `steps` のログ絞り込み (`--logs` / `--logs-match`)
+
+step/action 数が多いジョブで全 action のログを S3 から逐次取得すると遅い。見たいログだけに絞ると取得回数が減り高速化できる。デフォルト (`--logs all`・`--logs-match` 無し) は従来どおり全件取得。
+
+- `--logs all` (既定): 全 action のログを取得
+- `--logs failed`: status が失敗 (`failed` / `timedout` / `infrastructure_fail` / `canceled`) の action のみ取得
+- `--logs none`: ログを取得せず `meta.json` だけ生成
+- `--logs-match REGEX`: step 名に正規表現 (`re.search` の部分一致) がマッチする step のみ取得。完全一致は `^...$` を書く。`--logs failed` と併用すると AND (失敗 かつ 名前マッチ)
+- `--logs none` と `--logs-match` の併用、不正な正規表現はエラー終了する
+
+各 action の `log_status` (meta.json) で取得結果を判別できる:
+
+- `saved`: 取得・保存済み (`log_path` に実ファイル名)
+- `skipped`: 絞り込みで意図的に未取得 (`log_path` は null)
+- `no_output`: presigned URL が無く取得不能 (`log_path` は null)
+- `fetch_failed`: 取得を試みたが失敗 (`log_path` は null)
+
+2 段階の使い方: まず `--logs none` で `meta.json` だけ取得して step 構成を把握し、見たい step 名を決めてから別 run で `--logs-match '<step名>'` を取得する (毎回 fresh なディレクトリを作るため、`--output-dir` を変えるか既存を削除する)。
 
 #### `tests` の出力 (ファイル)
 
@@ -166,6 +186,30 @@ jq '[.steps[] | {name, ms: ([.actions[].run_time_millis] | add)}] | sort_by(-.ms
 
 ```bash
 jq '{parallelism, executor, resource_class, build_time_millis}' <DIR>/meta.json
+```
+
+step/action 数が多いジョブでログ取得を絞る例。失敗 step のログだけ取得:
+
+```bash
+<SKILL_DIR>/scripts/circleci.py steps \
+  --branch main --project gh/myorg/myproject --job build \
+  --logs failed --output-dir ./tmp
+```
+
+まず meta だけ取得して step 構成を把握する (ログ DL なし):
+
+```bash
+<SKILL_DIR>/scripts/circleci.py steps \
+  --branch main --project gh/myorg/myproject --job build \
+  --logs none --output-dir ./tmp
+```
+
+step 名を確認してから、特定 step のログだけ取得する (例: 名前に "go build" を含む step):
+
+```bash
+<SKILL_DIR>/scripts/circleci.py steps \
+  --branch main --project gh/myorg/myproject --job build \
+  --logs-match 'go build' --output-dir ./tmp
 ```
 
 ### `tests`
