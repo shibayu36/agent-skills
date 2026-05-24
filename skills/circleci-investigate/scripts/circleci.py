@@ -15,11 +15,18 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
-from typing import Any, NoReturn
+from typing import Any, Literal, NoReturn
 
 CIRCLECI_API_BASE = "https://circleci.com"
 HTTP_TIMEOUT_SEC = 30
 SLEEP_BETWEEN_REQUESTS_SEC = 0.2
+
+# Action statuses treated as "failed" by `steps --logs failed`. A whitelist
+# (not "anything but success") so that in-progress / unknown statuses are not
+# mistaken for failures when filtering a running job.
+FAILED_ACTION_STATUSES = frozenset(
+    {"failed", "timedout", "infrastructure_fail", "canceled"}
+)
 
 
 # ---------------------------------------------------------------
@@ -602,6 +609,57 @@ def _step_log_filename(step_index: int, step_name: str, action_index: int) -> st
     return f"step-{step_index:03d}-{sanitized}-{action_index}.log"
 
 
+def select_action_log_status(
+    step_name: str,
+    action_status: str | None,
+    has_output_url: bool,
+    logs_mode: str,
+    name_pattern: re.Pattern[str] | None,
+) -> Literal["fetch", "skipped", "no_output"]:
+    """Decide how to handle one action's log before any network I/O.
+
+    `output_url` is checked first: without it there is nothing to fetch
+    regardless of the filter, so it is reported as "no_output" rather than
+    "skipped" (the two are distinguished in meta.json's log_status).
+
+    Returns one of:
+      "fetch"     -- this action's log should be downloaded
+      "skipped"   -- intentionally excluded by --logs / --logs-match
+      "no_output" -- no presigned URL available, nothing to fetch
+
+    `cmd_steps` resolves a "fetch" result into the final log_status written to
+    meta.json: "saved" on success, "fetch_failed" if the download errors.
+    """
+    if not has_output_url:
+        return "no_output"
+    if logs_mode == "none":
+        return "skipped"
+    if name_pattern is not None and name_pattern.search(step_name) is None:
+        return "skipped"
+    if logs_mode == "failed" and action_status not in FAILED_ACTION_STATUSES:
+        return "skipped"
+    return "fetch"
+
+
+def compile_logs_filter(args: argparse.Namespace) -> re.Pattern[str] | None:
+    """Validate --logs / --logs-match and return the compiled name filter.
+
+    `--logs none` with `--logs-match` is contradictory (no logs would be
+    downloaded anyway), so it is rejected rather than silently ignored.
+    """
+    if args.logs_match is None:
+        return None
+    if args.logs == "none":
+        die(
+            "--logs none cannot be combined with --logs-match "
+            "(no logs would be downloaded)"
+        )
+    try:
+        return re.compile(args.logs_match)
+    except re.error as e:
+        die(f"Invalid --logs-match regex: {e}")
+
+
 def cmd_steps(ctx: Context, args: argparse.Namespace) -> None:
     """Save step metadata (resource_class / parallelism / per-step durations)
     and raw per-action logs to a directory.
@@ -616,6 +674,7 @@ def cmd_steps(ctx: Context, args: argparse.Namespace) -> None:
             meta.json                                  # job + step metadata
             step-NNN-<sanitized name>-<action>.log     # one per action
     """
+    name_pattern = compile_logs_filter(args)
     resolve_context(ctx, args)
     require_job_context(ctx, "steps")
     emit_resolved_if_any(ctx)
@@ -634,13 +693,19 @@ def cmd_steps(ctx: Context, args: argparse.Namespace) -> None:
         step_name = step.get("name", "")
         meta_actions: list[dict] = []
         for action_index, action in enumerate(step.get("actions", [])):
-            log_path: str | None = _step_log_filename(
-                step_index, step_name, action_index
-            )
             output_url = action.get("output_url")
-            if not output_url:
-                log_path = None
-            else:
+            log_status = select_action_log_status(
+                step_name,
+                action.get("status"),
+                bool(output_url),
+                args.logs,
+                name_pattern,
+            )
+            log_path: str | None = None
+            if log_status == "fetch":
+                log_path = _step_log_filename(
+                    step_index, step_name, action_index
+                )
                 try:
                     raw = fetch_public(output_url)
                     parts = json.loads(raw)
@@ -651,6 +716,7 @@ def cmd_steps(ctx: Context, args: argparse.Namespace) -> None:
                         f"{type(e).__name__}: {e}",
                         file=sys.stderr,
                     )
+                    log_status = "fetch_failed"
                     log_path = None
                 else:
                     abs_log_path = os.path.join(out_dir, log_path)
@@ -659,11 +725,13 @@ def cmd_steps(ctx: Context, args: argparse.Namespace) -> None:
                             msg = part.get("message", "")
                             if msg:
                                 lf.write(msg)
+                    log_status = "saved"
             meta_actions.append({
                 "action_index": action_index,
                 "status": action.get("status"),
                 "exit_code": action.get("exit_code"),
                 "run_time_millis": action.get("run_time_millis"),
+                "log_status": log_status,
                 "log_path": log_path,
             })
         meta_steps.append({
@@ -769,6 +837,20 @@ def build_parser() -> argparse.ArgumentParser:
     add_context_args(p_steps)
     p_steps.add_argument(
         "--output-dir", default="", help="output directory (default: $PWD)"
+    )
+    p_steps.add_argument(
+        "--logs",
+        choices=["all", "failed", "none"],
+        default="all",
+        help="which step logs to download (default: all)",
+    )
+    p_steps.add_argument(
+        "--logs-match",
+        default=None,
+        help=(
+            "regex matched against step name (re.search); download logs only "
+            "for matching steps. Combine with --logs failed for AND"
+        ),
     )
     p_steps.set_defaults(func=cmd_steps)
 
