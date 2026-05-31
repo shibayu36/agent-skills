@@ -1,10 +1,12 @@
 ---
 name: cluster-creator-kit-script
 description: >
-  Cluster Script APIの型定義（index.d.ts）からAPIリファレンスを検索・取得する。
-  「cluster scriptの〜メソッド」「〜のAPI」「ItemHandleの使い方」「PlayerHandleのメソッド」
-  「〜のシグネチャ」「〜の引数」などのリクエストで使用。
-  Bashでスクリプトを実行してAPI定義を検索し、JSDocコメント付きで提示する。
+  Cluster Script API（CCK Script）の型定義から、メソッド・引数・戻り値・型・シグネチャを検索して提示する。
+  「ItemHandle/PlayerHandle/ClusterScript等のメソッド」「〜のAPI」「〜のシグネチャ」
+  「〜の引数や戻り値の型」など、Script APIの仕様・定義そのものを問うリクエストで使用。
+  Scriptを使った実装方法・サンプルコード・チュートリアル（「Scriptで〜する方法」）や、
+  操作手順・設定方法など、APIの型・シグネチャを伴わない解説は対象外（Cluster Creators Guide側）。
+  Bashでindex.d.tsを検索し、JSDocコメント付きで提示する。
 ---
 
 # Cluster Script API Search
