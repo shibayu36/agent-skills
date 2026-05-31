@@ -17,10 +17,10 @@ Cluster Script APIの型定義ファイル（index.d.ts）からAPI情報を検�
 
 ### search.py - API検索
 ```bash
-python3 ${SKILL_DIR}/scripts/search.py "キーワード"
+python3 ${SKILL_DIR}/scripts/search.py "キーワード" [--output-dir DIR]
 ```
 キーワードでAPI定義を検索し、マッチしたエントリ（JSDocコメント + シグネチャ）をテキスト形式で出力する。
-最大30件まで。ファイルが未ダウンロードの場合は自動でダウンロードする。
+最大30件まで。`<output-dir>/cluster-script-index.d.ts` を参照し、未ダウンロードの場合は自動でダウンロードする。
 
 ### download.py - 型定義ファイルの更新
 ```bash
@@ -28,8 +28,10 @@ python3 ${SKILL_DIR}/scripts/download.py [--output-dir DIR]
 ```
 最新のindex.d.tsをダウンロードして `<output-dir>/cluster-script-index.d.ts` に保存する。型定義を最新に更新したい場合に手動実行する。
 
-- 保存先は `--output-dir` が無ければ `$PWD` 直下
-- ユーザーの一時ファイル配置方針があれば、それに従って `--output-dir` を明示的に指定すること
+### 保存先について
+
+- search.py / download.py とも保存先は共通で、`--output-dir` が無ければ `$PWD` 直下の `cluster-script-index.d.ts`
+- ユーザーの一時ファイル配置方針があれば、それに従って `--output-dir` を明示的に指定すること（例: `--output-dir tmp`）
 
 ## ワークフロー
 

@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Cluster Script APIの型定義ファイルからJSDocエントリ単位でキーワード検索する"""
 
+import argparse
 import os
 import re
 import sys
 
-from download import download, get_data_path
+from download import download, resolve_data_path
 
 MAX_RESULTS = 30
 
@@ -158,20 +159,26 @@ def format_results(results, keyword):
 
 
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: search.py <keyword>", file=sys.stderr)
-        sys.exit(1)
+    parser = argparse.ArgumentParser(
+        description="Search Cluster Script API type definitions (index.d.ts)"
+    )
+    parser.add_argument("keyword", help="search keyword")
+    parser.add_argument(
+        "--output-dir",
+        default="",
+        help="directory holding index.d.ts (default: $PWD)",
+    )
+    args = parser.parse_args()
 
-    keyword = sys.argv[1]
-    data_path = get_data_path()
+    data_path = resolve_data_path(args.output_dir)
     ensure_file(data_path)
 
     with open(data_path, "r", encoding="utf-8") as f:
         lines = f.readlines()
 
     entries = parse_entries(lines)
-    results = search_entries(entries, keyword)
-    print(format_results(results, keyword))
+    results = search_entries(entries, args.keyword)
+    print(format_results(results, args.keyword))
 
 
 if __name__ == "__main__":

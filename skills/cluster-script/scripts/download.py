@@ -11,14 +11,9 @@ URL = "https://docs.cluster.mu/script/index.d.ts"
 FILENAME = "cluster-script-index.d.ts"
 
 
-def get_data_path():
-    """スクリプトの位置から保存先パスを算出する (search.pyの自動DLキャッシュ用)"""
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    # scripts/ -> cluster-script/ -> skills/ -> .claude/
-    skill_dir = os.path.dirname(script_dir)
-    skills_dir = os.path.dirname(skill_dir)
-    claude_dir = os.path.dirname(skills_dir)
-    return os.path.join(claude_dir, "tmp", FILENAME)
+def resolve_data_path(output_dir=""):
+    """保存先パスを算出する (--output-dir 未指定時は $PWD 直下)"""
+    return os.path.join(output_dir or os.getcwd(), FILENAME)
 
 
 def download(dest_path):
@@ -52,9 +47,7 @@ def main():
     )
     args = parser.parse_args()
 
-    out_dir = args.output_dir or os.getcwd()
-    dest_path = os.path.join(out_dir, FILENAME)
-    download(dest_path)
+    download(resolve_data_path(args.output_dir))
 
 
 if __name__ == "__main__":
