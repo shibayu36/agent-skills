@@ -11,6 +11,7 @@ Skills follow the [Agent Skills](https://agentskills.io/) format.
 - **git-rebase** - Run `git rebase` non-interactively from natural language instructions. Handles commit reorganization (squash/fixup/reword/drop/split/reorder), upstream incorporation, conflict resolution, and stacked rebase (`--update-refs`). Use when reorganizing commit history.
 - **github-pr-review-operation** - GitHub Pull Request review operations using `gh` CLI. Use when performing PR reviews, reading diffs, posting comments, or replying to review threads.
 - **gws-docs-to-markdown** - Convert a Google Docs URL into a Markdown file with embedded images extracted to local files, using the `gws` CLI. Use when reading a Google Docs document.
+- **search-cluster-creators-guide** - Search the Cluster Creators Guide (creator.cluster.mu) for how-to articles and fetch their full text as Markdown. Use when looking up how to do something in the Cluster Creator Kit (world/item creation guides, gimmicks, triggers).
 
 ## Installation
 
