@@ -46,9 +46,8 @@ python3 ${SKILL_DIR}/scripts/download.py [--output-dir DIR]
 3. **interface/classで絞り込み**: ItemHandle, PlayerHandle, ClusterScript, Vector3 等のコンテキスト名も検索対象
 4. **関連用語で横断検索**: 「アニメーション」「衝突」「マテリアル」等
 
-## Creators Guideスキルとの使い分け
+## スコープ
 
-| 観点 | search-cluster-creators-guide | cluster-creator-kit-script |
-|---|---|---|
-| 対象 | Creators Guide記事（手順・解説） | Script API型定義（リファレンス） |
-| 用途 | 「〜のやり方」「〜を設定する方法」 | 「〜メソッドの引数」「〜のAPI仕様」 |
+このスキルは Cluster Creator Kit Script の**API仕様（型定義）の参照専用**。
+「〜メソッドの引数」「〜の型」「〜のAPI仕様」といったリファレンス用途に使う。
+操作手順や解説（「〜のやり方」「〜を設定する方法」）は対象外で、Cluster Creators Guide (creator.cluster.mu) を参照すること。
