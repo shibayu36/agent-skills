@@ -1,5 +1,5 @@
 ---
-name: cluster-script
+name: cluster-creator-kit-script
 description: >
   Cluster Script APIの型定義（index.d.ts）からAPIリファレンスを検索・取得する。
   「cluster scriptの〜メソッド」「〜のAPI」「ItemHandleの使い方」「PlayerHandleのメソッド」
@@ -48,7 +48,7 @@ python3 ${SKILL_DIR}/scripts/download.py [--output-dir DIR]
 
 ## Creators Guideスキルとの使い分け
 
-| 観点 | search-cluster-creators-guide | cluster-script |
+| 観点 | search-cluster-creators-guide | cluster-creator-kit-script |
 |---|---|---|
 | 対象 | Creators Guide記事（手順・解説） | Script API型定義（リファレンス） |
 | 用途 | 「〜のやり方」「〜を設定する方法」 | 「〜メソッドの引数」「〜のAPI仕様」 |
