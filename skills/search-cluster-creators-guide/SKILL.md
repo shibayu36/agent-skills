@@ -1,8 +1,11 @@
 ---
 name: search-cluster-creators-guide
 description: >
-  Cluster Creators Guide（creator.cluster.mu）からクリエイター向け情報を検索・調査する。
-  「clusterの〜について調べて」「〜の使い方」「〜する方法」「〜を探して」などのリクエストで使用。
+  Cluster Creators Guide（creator.cluster.mu）の記事から、ワールド制作・アイテム/アバターのアップロード・
+  各種設定・操作手順、およびScriptを使った実装方法・サンプルなど、クリエイター向け情報を検索・調査する。
+  「clusterで〜する方法」「clusterの〜のやり方」「Scriptで〜する方法」「clusterの〜について調べて」
+  「clusterの〜の記事を探して」など、clusterでの制作・操作・実装の手順や解説を求めるリクエストで使用。
+  特定APIの型・引数・シグネチャそのものの参照は対象外（cluster-creator-kit-script側）。
   Bashでスクリプトを実行してサイト検索・記事取得を行い、関連情報を抽出して提示する。
 ---
 
