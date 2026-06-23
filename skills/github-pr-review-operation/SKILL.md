@@ -90,6 +90,12 @@ gh api repos/OWNER/REPO/pulls/NUMBER/comments --jq '.[] | {id, user: .user.login
 gh pr comment NUMBER --repo OWNER/REPO --body "Comment body"
 ```
 
+For a complex body (backticks, `$`, quotes, newlines), write the body to a file and pass it
+with `--body-file <file>`:
+```bash
+gh pr comment NUMBER --repo OWNER/REPO --body-file <file>
+```
+
 ### 5. Inline Comment (on specific code lines)
 
 First, get the head commit SHA:
@@ -121,8 +127,22 @@ gh api repos/OWNER/REPO/pulls/NUMBER/comments \
   -f start_side=RIGHT
 ```
 
+For a complex body (backticks, `$`, quotes, newlines), write the body to a file and pass it
+with `-F body=@<file>`. Do not use `-f body=@<file>` — `-f` (raw-field) does not expand `@`,
+so the literal path is posted as the body.
+```bash
+gh api repos/OWNER/REPO/pulls/NUMBER/comments \
+  --method POST \
+  -F body=@<file> \
+  -f commit_id="COMMIT_SHA" \
+  -f path="src/example.py" \
+  -F line=15 \
+  -f side=RIGHT
+```
+
 **Notes:**
-- `-F` (uppercase): Use for numeric parameters (`line`, `start_line`). Using `-f` sends them as strings and causes errors
+- `-f` (raw-field): sends the value as a literal string; does not expand `@file`
+- `-F` (field): converts numbers/booleans by type and expands `@file` into file contents. Use `-F` for numeric parameters (`line`, `start_line`) and for passing a body from a file. Using `-f` for numeric parameters sends them as strings and causes errors
 - `side`: `RIGHT` (added lines) or `LEFT` (deleted lines)
 
 ### 6. Reply to a Comment
@@ -132,5 +152,7 @@ gh api repos/OWNER/REPO/pulls/NUMBER/comments/COMMENT_ID/replies \
   --method POST \
   -f body="Reply body"
 ```
+
+For a complex body, write it to a file and pass it with `-F body=@<file>` (see Operation 5).
 
 Use the `id` obtained from comment retrieval as `COMMENT_ID`.
