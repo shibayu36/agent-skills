@@ -44,20 +44,18 @@ gh pr view NUMBER --repo OWNER/REPO --json title,body,author,state,baseRefName,h
 ### 2. Get Diff (with line numbers)
 
 ```bash
-gh pr diff NUMBER --repo OWNER/REPO | awk '
-/^@@/ {
-  match($0, /-([0-9]+)/, old)
-  match($0, /\+([0-9]+)/, new)
-  old_line = old[1]
-  new_line = new[1]
-  print $0
-  next
-}
-/^-/ { printf "L%-4d     | %s\n", old_line++, $0; next }
-/^\+/ { printf "     R%-4d| %s\n", new_line++, $0; next }
-/^ / { printf "L%-4d R%-4d| %s\n", old_line++, new_line++, $0; next }
-{ print }
-'
+gh pr diff NUMBER --repo OWNER/REPO | awk 'BEGIN {
+  while ((getline line) > 0) {
+    if (line ~ /^@@/) {
+      match(line, /-[0-9]+/); old_line = substr(line, RSTART + 1, RLENGTH - 1)
+      match(line, /\+[0-9]+/); new_line = substr(line, RSTART + 1, RLENGTH - 1)
+      print line
+    } else if (line ~ /^-/) { printf "L%-4d     | %s\n", old_line++, line }
+    else if (line ~ /^\+/) { printf "     R%-4d| %s\n", new_line++, line }
+    else if (line ~ /^ /) { printf "L%-4d R%-4d| %s\n", old_line++, new_line++, line }
+    else print line
+  }
+}'
 ```
 
 Example output:
