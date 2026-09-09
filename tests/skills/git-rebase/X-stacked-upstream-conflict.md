@@ -10,12 +10,13 @@ stacked branch 構成（`main → feature-base → feature-A → feature-B`）�
 
 ## セットアップ
 
-スクリプトに分離。実行すると `$TMPDIR/git-rebase-test-X/work` に作業 clone を作り、`feature-B` checkout 状態にする。
+スクリプトに分離。実行すると `${TMPDIR:-/tmp}/git-rebase-test-X.XXXXXX`（`XXXXXX` はランダムな接尾辞）配下の `work/` に作業 clone を作り、`feature-B` checkout 状態にする。
 
 ```bash
 bash tests/skills/git-rebase/fixtures/setup-X.sh
-cd "${TMPDIR:-/tmp}/git-rebase-test-X/work"
 ```
+
+実行結果の `WORK_DIR=...` に表示されたパスを使い、`cd "<WORK_DIR の値>"` で作業 clone に移動する。
 
 セットアップ後の状態：
 
